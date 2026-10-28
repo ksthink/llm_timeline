@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM TIMELINE</title>
+  </head>
+  <body>
+    <header>
+      <h1>LLM TIMELINE</h1>
+      <p id="stats">모델을 불러오는 중</p>
+    </header>
+    <div class="toolbar">
+      <div class="filters">
+        <label>분야
+          <select id="field">
+            <option value="">전체</option>
+          </select>
+        </label>
+        <label>국가
+          <select id="country">
+            <option value="">전체</option>
+          </select>
+        </label>
+        <label>공개
+          <select id="lane">
+            <option value="">전체</option>
+            <option value="open">오픈</option>
+            <option value="closed">비공개</option>
+            <option value="unknown">미확인</option>
+          </select>
+        </label>
+        <button type="button" id="reset">전체 기간</button>
+      </div>
+      <div id="eras"></div>
+    </div>
+    <p class="toolbar key">큰 숫자 이정표 · 채운 점 검증 일치 · 빈 점 수정 · 다이아몬드 불일치·확인불가 · 흰 테두리 한국 · 흰 점 시대 경계</p>
+    <div class="stage">
+      <div id="chart" role="img" aria-label="2015년부터 2026년까지의 LLM 타임라인 차트"></div>
+      <aside id="detail"></aside>
+    </div>
+    <footer>
+      <p>자료 283건, 2015–2026. 세로 위치는 공개 여부를 나눈 자리이며 성능 점수가 아닙니다. 휠이나 아래 슬라이더로 구간을 옮기고, 점을 누르면 모델 정보가 열립니다. 차트는 Apache ECharts입니다.</p>
+    </footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
