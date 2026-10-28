@@ -116,8 +116,43 @@ function markerSeries() {
   };
 }
 
+function dotSize(model, count, spanDays) {
+  if (model.landmark) return 16;
+  if (count <= 40) return 12;
+  if (spanDays > 1400) return 6;
+  if (spanDays > 700) return 8;
+  return 10;
+}
+
+function haloSeries(models, spanDays, selectedId) {
+  return {
+    name: "한국",
+    type: "scatter",
+    z: 2,
+    silent: true,
+    animationDurationUpdate: 400,
+    tooltip: { show: false },
+    emphasis: { disabled: true },
+    data: models
+      .filter((model) => model.country === "한국")
+      .map((model) => {
+        const view = appearance(model);
+        const selected = model.id === selectedId;
+        return {
+          value: [view.timestamp, view.y],
+          symbol: "circle",
+          symbolSize: dotSize(model, models.length, spanDays) + (selected ? 8 : 5),
+          itemStyle: {
+            color: "transparent",
+            borderColor: "#f4f4f4",
+            borderWidth: selected ? 1.6 : 1.1,
+          },
+        };
+      }),
+  };
+}
+
 function modelSeries(models, spanDays, selectedId) {
-  const dense = spanDays > 1000;
   return {
     name: "모델",
     type: "scatter",
@@ -130,30 +165,19 @@ function modelSeries(models, spanDays, selectedId) {
       const label = labelFor(model, spanDays, selectedId);
       const lane = view.lane;
       const selected = model.id === selectedId;
-      const korea = view.korea;
-      const revised = model.verify === "수정";
+      const hollow = model.verify === "수정";
       const color = view.era?.color ?? "#9a9a9a";
-      let borderColor = "rgba(0,0,0,0.35)";
-      let borderWidth = 0;
-      if (korea) {
-        borderColor = "#f5f5f5";
-        borderWidth = 1.6;
-      }
-      if (selected) {
-        borderColor = "#ffffff";
-        borderWidth = 2.4;
-      }
-      const baseSize = model.landmark ? 15 : dense ? 6 : 8;
+      const baseSize = dotSize(model, models.length, spanDays);
       return {
         value: [view.timestamp, view.y],
         model,
         labelText: label.text,
-        symbol: view.symbol,
-        symbolSize: selected ? baseSize + 5 : baseSize,
+        symbol: hollow ? "circle" : view.symbol,
+        symbolSize: selected ? baseSize + 4 : baseSize,
         itemStyle: {
-          color: revised ? "transparent" : color,
-          borderColor: revised ? (korea || selected ? "#f5f5f5" : color) : borderColor,
-          borderWidth: revised ? (korea || selected ? 2 : 1.5) : borderWidth,
+          color: hollow ? "#070708" : color,
+          borderColor: hollow ? color : "transparent",
+          borderWidth: hollow ? 1.6 : 0,
           opacity: model.landmark || selected ? 1 : 0.92,
         },
         label: {
@@ -177,8 +201,8 @@ function modelSeries(models, spanDays, selectedId) {
     },
     labelLayout: { hideOverlap: true },
     emphasis: {
-      focus: "self",
-      scale: 1.35,
+      focus: "none",
+      scale: 1.45,
       label: {
         show: true,
         color: "#ffffff",
@@ -213,16 +237,26 @@ function tooltipFormatter(params) {
 }
 
 export function buildSeries(models, { spanDays, selectedId }) {
-  return [...waveSeries(), modelSeries(models, spanDays, selectedId), markerSeries()];
+  return [...waveSeries(), haloSeries(models, spanDays, selectedId), modelSeries(models, spanDays, selectedId), markerSeries()];
 }
 
-function baseOption(series, spanDays, animate) {
+function gridFor(width) {
+  const narrow = width < 640;
+  return {
+    left: narrow ? 52 : 96,
+    right: narrow ? 12 : 28,
+    top: narrow ? 36 : 72,
+    bottom: narrow ? 58 : 74,
+  };
+}
+
+function baseOption(series, spanDays, animate, elementWidth) {
   return {
     backgroundColor: "transparent",
     animation: animate,
     animationDurationUpdate: animate ? 400 : 0,
     textStyle: { fontFamily: FONT },
-    grid: { left: 96, right: 28, top: 72, bottom: 74 },
+    grid: gridFor(elementWidth),
     tooltip: {
       trigger: "item",
       confine: true,
@@ -353,10 +387,16 @@ export function mountChart(element, models, { onSelect, onView, animate = true }
 
   function draw() {
     const rows = filtered();
+    if (rows.length && !rows.some((model) => model.id === state.selectedId)) {
+      const next = rows.find((model) => model.landmark) ?? rows[0];
+      state.selectedId = next.id;
+      onSelect?.(next);
+    }
     const series = buildSeries(rows, { spanDays: state.spanDays, selectedId: state.selectedId });
     applying = true;
+    if (ready) chart.dispatchAction({ type: "hideTip" });
     if (!ready) {
-      chart.setOption(baseOption(series, state.spanDays, animate));
+      chart.setOption(baseOption(series, state.spanDays, animate, element.clientWidth));
       ready = true;
     } else {
       chart.setOption(
@@ -420,7 +460,10 @@ export function mountChart(element, models, { onSelect, onView, animate = true }
     draw();
   }
 
-  window.addEventListener("resize", () => chart.resize());
+  window.addEventListener("resize", () => {
+    chart.resize();
+    chart.setOption({ grid: gridFor(element.clientWidth) });
+  });
 
   draw();
   const initial = models.find((model) => model.id === state.selectedId);

@@ -135,3 +135,7 @@ laneSelect.addEventListener("change", applyFilter);
 resetButton.addEventListener("click", () => chart.resetZoom());
 
 document.fonts?.ready.then(() => chart.resize());
+
+if (import.meta.env.DEV) {
+  window.__timeline = chart;
+}
