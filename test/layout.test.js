@@ -2,95 +2,86 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
-  ERAS,
-  LANE,
-  appearance,
+  COLOR_END,
+  COLOR_START,
+  contrastRatio,
   eraOf,
-  labelFor,
-  matches,
-  parseRelease,
+  filterModels,
+  readableOnDark,
   usableUrl,
-  waveY,
+  yearCards,
+  yearColor,
 } from "../src/layout.js";
+import { logoFor } from "../src/logos.js";
 
 const payload = JSON.parse(
   await readFile(new URL("../src/data/models.json", import.meta.url), "utf8"),
 );
-const models = payload.models;
+const cards = yearCards(payload.models);
 
-const LANDMARKS = [
-  "AlphaGo (이세돌 대국)",
-  "Transformer",
-  "BERT",
-  "GPT-2",
-  "GPT-3",
-  "CLIP",
-  "DALL·E",
-  "HyperCLOVA",
-  "Stable Diffusion",
-  "ChatGPT (GPT-3.5)",
-  "LLaMA",
-  "GPT-4",
-  "Sora (발표)",
-  "Gemini 1.5 Pro",
-  "Claude 3",
-  "EXAONE 3.0",
-  "DeepSeek-R1",
-];
+test("2015년부터 2026년까지 연도 카드 12장에 283개 모델이 들어간다", () => {
+  assert.equal(cards.length, 12);
+  assert.equal(cards[0].year, 2015);
+  assert.equal(cards.at(-1).year, 2026);
+  assert.equal(cards.reduce((sum, card) => sum + card.models.length, 0), 283);
+  for (const card of cards) assert.ok(card.models.length > 0, String(card.year));
+});
 
-test("283개 모델이 모두 시대와 레인에 들어간다", () => {
-  assert.equal(models.length, 283);
-  for (const model of models) {
-    const view = appearance(model);
-    assert.ok(view.era, model.date);
-    assert.ok(view.year >= 2015 && view.year <= 2026, model.date);
-    if (view.lane > 0) assert.ok(view.y > view.wave + 0.4, model.name);
-    if (view.lane < 0) assert.ok(view.y < view.wave - 0.4, model.name);
-    if (view.lane === 0) assert.ok(Math.abs(view.y - view.wave) < 0.2, model.name);
+test("대표 모델은 이정표이고, 같은 해의 나머지는 불릿으로 줄인다", () => {
+  const card2017 = cards.find((card) => card.year === 2017);
+  const card2022 = cards.find((card) => card.year === 2022);
+  const card2025 = cards.find((card) => card.year === 2025);
+  assert.equal(card2017.lead.name, "Transformer");
+  assert.equal(card2022.lead.name, "Stable Diffusion");
+  assert.ok(card2022.lines.some((line) => line.includes("ChatGPT")));
+  assert.equal(card2025.lead.name, "DeepSeek-R1");
+  assert.equal(card2025.models.length, 79);
+  assert.ok(card2025.lines.at(-1).includes("외 75건"));
+  assert.equal(cards.find((card) => card.year === 2015).lines.length, 0);
+});
+
+test("점 색은 노랑에서 초록으로 이동하고 시대가 비지 않는다", () => {
+  assert.equal(yearColor(0, 12).toLowerCase(), COLOR_START.toLowerCase());
+  assert.equal(yearColor(11, 12).toLowerCase(), COLOR_END.toLowerCase());
+  const reds = cards.map((card) => parseInt(card.color.slice(1, 3), 16));
+  assert.ok(reds.at(-1) < reds[0]);
+  for (let year = 2015; year <= 2026; year += 1) assert.ok(eraOf(year));
+});
+
+test("연도 글자는 어두운 배경과 구분된다", () => {
+  for (let index = 0; index < 12; index += 1) {
+    const ink = readableOnDark(yearColor(index, 12));
+    assert.ok(contrastRatio(ink, "#444444") >= 4.5, ink);
   }
+  assert.equal(readableOnDark(COLOR_START).toLowerCase(), COLOR_START.toLowerCase());
+  assert.notEqual(readableOnDark(COLOR_END).toLowerCase(), COLOR_END.toLowerCase());
 });
 
-test("공개 레인은 오픈 140, 비공개 140, 미확인 3이다", () => {
-  assert.equal(models.filter((model) => LANE[model.openness] === 1).length, 140);
-  assert.equal(models.filter((model) => LANE[model.openness] === -1).length, 140);
-  assert.equal(models.filter((model) => LANE[model.openness] === 0).length, 3);
+test("국가와 모델 이름으로 함께 거른다", () => {
+  assert.equal(filterModels(payload.models, {}).length, 283);
+  assert.equal(filterModels(payload.models, { country: "한국" }).length, 31);
+  const exaone = filterModels(payload.models, { country: "한국", model: "exaone" });
+  assert.ok(exaone.length > 0);
+  assert.ok(exaone.every((model) => model.country === "한국" && /exaone/i.test(model.name)));
+  const gpt4 = filterModels(payload.models, { model: "GPT-4" });
+  assert.ok(gpt4.some((model) => model.name === "GPT-4"));
+  assert.equal(filterModels(payload.models, { country: "한국", model: "GPT-4" }).length, 0);
 });
 
-test("이정표 17개가 데이터에 있다", () => {
-  const names = models.filter((model) => model.landmark).map((model) => model.name).sort();
-  assert.deepEqual(names, [...LANDMARKS].sort());
+test("회사 로고는 알려진 회사와 그 밖을 모두 그린다", () => {
+  const openai = logoFor("OpenAI");
+  const monogram = logoFor("Upstage");
+  assert.match(openai.src, /^data:image\/svg\+xml/);
+  assert.match(openai.srcBrand, /%23/);
+  assert.equal(openai.label, "OpenAI");
+  assert.match(monogram.src, /^data:image\/svg\+xml/);
+  assert.match(decodeURIComponent(monogram.src), /UP/);
+  assert.match(logoFor("Google DeepMind").srcBrand, /%23/);
+  assert.notEqual(logoFor("Google DeepMind").label, logoFor("Google").label);
 });
 
-test("한국 모델 31건만 국가 필터에 남는다", () => {
-  assert.equal(models.filter((model) => matches(model, { country: "한국" })).length, 31);
-  assert.equal(models.filter((model) => matches(model, { field: "언어", lane: "open" })).length,
-    models.filter((model) => model.field === "언어" && LANE[model.openness] === 1).length);
-});
-
-test("전체 기간에서는 이정표 숫자만 보이고, 좁히면 이름이 붙는다", () => {
-  const landmark = models.find((model) => model.name === "BERT");
-  const other = models.find((model) => !model.landmark);
-  assert.equal(labelFor(landmark, 2000, -1).text, "1810");
-  assert.equal(labelFor(landmark, 400, -1).show, true);
-  assert.match(labelFor(landmark, 400, -1).text, /BERT/);
-  assert.equal(labelFor(other, 2000, -1).show, false);
-  assert.equal(labelFor(other, 100, -1).show, true);
-  assert.equal(labelFor(other, 2000, other.id).show, true);
-});
-
-test("시대는 2015년부터 2026년까지 빠지지 않는다", () => {
-  for (let year = 2015; year <= 2026; year += 1) {
-    assert.ok(eraOf(year), String(year));
-  }
-  assert.equal(ERAS.length, 5);
-});
-
-test("출시일과 링크를 읽는다", () => {
-  assert.equal(new Date(parseRelease("2015-10")).getUTCMonth(), 9);
-  assert.equal(new Date(parseRelease("2015-10")).getUTCDate(), 15);
-  assert.equal(new Date(parseRelease("2016-03-09")).getUTCDate(), 9);
+test("빈 주소와 실제 주소를 가른다", () => {
   assert.equal(usableUrl("해당없음"), "");
   assert.equal(usableUrl("미확인"), "");
   assert.equal(usableUrl("https://arxiv.org/abs/1706.03762"), "https://arxiv.org/abs/1706.03762");
-  assert.ok(Math.abs(waveY(Date.UTC(2014, 10, 1))) < 1e-9);
 });

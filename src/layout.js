@@ -1,107 +1,87 @@
-/** 타임라인 좌표. 차트 라이브러리와 분리해 두고 테스트한다. */
+/** 연도 카드. JointJS 다이어그램과 분리해 둔다. */
+
+export const YEAR_MIN = 2015;
+export const YEAR_MAX = 2026;
+export const COLOR_START = "#F4F269";
+export const COLOR_END = "#4DA562";
 
 export const ERAS = [
-  { id: "foundation", label: "2015–2017", name: "기반", start: 2015, end: 2017, color: "#E8893A" },
-  { id: "pretrain", label: "2018–2020", name: "사전학습", start: 2018, end: 2020, color: "#C45C4A" },
-  { id: "generate", label: "2021–2022", name: "생성", start: 2021, end: 2022, color: "#C6A15B" },
-  { id: "compete", label: "2023–2024", name: "경쟁", start: 2023, end: 2024, color: "#D07A4A" },
-  { id: "reason", label: "2025–2026", name: "추론", start: 2025, end: 2026, color: "#6A9BB5" },
+  { id: "foundation", name: "기반", start: 2015, end: 2017 },
+  { id: "pretrain", name: "사전학습", start: 2018, end: 2020 },
+  { id: "generate", name: "생성", start: 2021, end: 2022 },
+  { id: "compete", name: "경쟁", start: 2023, end: 2024 },
+  { id: "reason", name: "추론", start: 2025, end: 2026 },
 ];
 
-/** 오픈 계열은 파도 위, 비공개는 파도 아래, 미확인은 파도 위. */
-export const LANE = {
-  오픈웨이트: 1,
-  오픈: 1,
-  "오픈(코드)": 1,
-  비공개: -1,
-  미확인: 0,
-};
+const NAMED_BULLETS = 3;
 
-export const AXIS_START = Date.UTC(2014, 10, 1);
-export const AXIS_END = Date.UTC(2027, 2, 1);
-
-/** 이 일수보다 좁히면 이정표 이름이 붙고, 더 좁히면 나머지 모델 이름도 붙는다. */
-export const LANDMARK_NAME_SPAN_DAYS = 900;
-export const ALL_NAME_SPAN_DAYS = 400;
-export const MONTH_AXIS_SPAN_DAYS = 800;
-
-const WAVE_AMP = 0.52;
-const LANE_GAP = 0.78;
-const JITTER = 0.26;
-
-export function parseRelease(dateStr) {
-  const [yearText, monthText, dayText] = dateStr.split("-");
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = dayText ? Number(dayText) : 15;
-  if (!year || !month || !day) {
-    throw new Error(`출시일을 읽을 수 없습니다: ${dateStr}`);
-  }
-  return Date.UTC(year, month - 1, day);
-}
-
-export function timeNorm(timestamp) {
-  return (timestamp - AXIS_START) / (AXIS_END - AXIS_START);
-}
-
-/** 왼쪽 끝과 오른쪽 끝이 0인 사인파. 한 주기당 위·아래 아치가 하나씩이다. */
-export function waveY(timestamp) {
-  return Math.sin(timeNorm(timestamp) * Math.PI * 8) * WAVE_AMP;
-}
-
-function hashUnit(text) {
-  let hash = 2166136261;
-  for (const char of text) {
-    hash ^= char.codePointAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) / 4294967295;
-}
-
-export function pointY(model) {
-  const timestamp = parseRelease(model.date);
-  const lane = LANE[model.openness];
-  if (lane === undefined) {
-    throw new Error(`오픈여부를 배치할 수 없습니다: ${model.openness}`);
-  }
-  const spread = lane === 0 ? 0.1 : JITTER;
-  const jitter = (hashUnit(`${model.name}|${model.date}`) * 2 - 1) * spread;
-  return waveY(timestamp) + lane * (lane === 0 ? 0 : LANE_GAP) + jitter;
+export function releaseYear(date) {
+  const year = Number(String(date).slice(0, 4));
+  if (!year) throw new Error(`출시일을 읽을 수 없습니다: ${date}`);
+  return year;
 }
 
 export function eraOf(year) {
   return ERAS.find((era) => year >= era.start && year <= era.end) ?? null;
 }
 
-export function eraForTimestamp(timestamp) {
-  const year = new Date(timestamp).getUTCFullYear();
-  if (year < ERAS[0].start) return ERAS[0];
-  if (year > ERAS[ERAS.length - 1].end) return ERAS[ERAS.length - 1];
-  return eraOf(year);
+export function lerpHex(start, end, t) {
+  const from = hexChannels(start);
+  const to = hexChannels(end);
+  const channels = from.map((value, index) => Math.round(value + (to[index] - value) * t));
+  return `#${channels.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function wavePoints() {
-  const day = 24 * 60 * 60 * 1000;
-  const points = [];
-  for (let time = AXIS_START; time <= AXIS_END; time += 3 * day) {
-    points.push([time, waveY(time)]);
+export function yearColor(index, count) {
+  const t = count <= 1 ? 0 : index / (count - 1);
+  return lerpHex(COLOR_START, COLOR_END, t);
+}
+
+export function shadeHexColor(color, percent) {
+  const channels = hexChannels(color);
+  const target = percent < 0 ? 0 : 255;
+  const amount = percent < 0 ? -percent : percent;
+  const mixed = channels.map((value) => Math.round((target - value) * amount) + value);
+  return `#${mixed.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function linearChannel(value) {
+  const channel = value / 255;
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+export function contrastRatio(foreground, background) {
+  const luminance = (color) => {
+    const [red, green, blue] = hexChannels(color);
+    return 0.2126 * linearChannel(red) + 0.7152 * linearChannel(green) + 0.0722 * linearChannel(blue);
+  };
+  const lighter = Math.max(luminance(foreground), luminance(background));
+  const darker = Math.min(luminance(foreground), luminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** 어두운 보드 위 연도 글자. 점 색은 그대로 두고, 글자만 대비가 날 때까지 밝힌다. */
+export function readableOnDark(color, background = "#444444") {
+  let current = color;
+  for (let step = 0; step < 16; step += 1) {
+    if (contrastRatio(current, background) >= 4.5) return current;
+    current = shadeHexColor(current, 0.1);
   }
-  const last = points[points.length - 1];
-  if (!last || last[0] !== AXIS_END) {
-    points.push([AXIS_END, waveY(AXIS_END)]);
-  }
-  return points;
+  return "#ffffff";
 }
 
-export function symbolFor(verify) {
-  if (verify === "수정") return "emptyCircle";
-  if (verify === "불일치·확인불가") return "diamond";
-  return "circle";
+function hexChannels(color) {
+  const value = parseInt(color.slice(1), 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-export function yymm(date) {
-  const [year, month] = date.split("-");
-  return `${year.slice(2)}${month}`;
+export function filterModels(models, { country = "", model = "" } = {}) {
+  const query = model.trim().toLocaleLowerCase("en");
+  return models.filter((item) => {
+    if (country && item.country !== country) return false;
+    if (query && !item.name.toLocaleLowerCase("en").includes(query)) return false;
+    return true;
+  });
 }
 
 export function usableUrl(value) {
@@ -111,44 +91,33 @@ export function usableUrl(value) {
   return text;
 }
 
-export function matches(model, filter) {
-  if (filter.field && model.field !== filter.field) return false;
-  if (filter.country && model.country !== filter.country) return false;
-  if (filter.lane === "open" && LANE[model.openness] !== 1) return false;
-  if (filter.lane === "closed" && LANE[model.openness] !== -1) return false;
-  if (filter.lane === "unknown" && LANE[model.openness] !== 0) return false;
-  return true;
+function othersAfter(lead, models) {
+  return models.filter((model) => model !== lead);
 }
 
-export function appearance(model) {
-  const timestamp = parseRelease(model.date);
-  const year = new Date(timestamp).getUTCFullYear();
-  const wave = waveY(timestamp);
-  const y = pointY(model);
-  return {
-    timestamp,
-    year,
-    era: eraOf(year),
-    lane: LANE[model.openness],
-    wave,
-    y,
-    symbol: symbolFor(model.verify),
-    korea: model.country === "한국",
-  };
-}
-
-export function labelFor(model, spanDays, selectedId) {
-  if (model.id === selectedId) {
-    return { show: true, text: `${yymm(model.date)}\n${model.name}` };
+export function yearCards(models) {
+  const cards = [];
+  for (let year = YEAR_MIN; year <= YEAR_MAX; year += 1) {
+    const rows = models.filter((model) => releaseYear(model.date) === year);
+    const lead = rows.find((model) => model.landmark) ?? rows[0] ?? null;
+    const others = lead ? othersAfter(lead, rows) : [];
+    const named = [];
+    const ordered = [...others.filter((model) => model.landmark), ...others.filter((model) => !model.landmark)];
+    for (const model of ordered) {
+      if (named.length >= NAMED_BULLETS) break;
+      named.push(model.name);
+    }
+    const hidden = others.length - named.length;
+    const lines = named.map((name) => `● ${name}`);
+    if (hidden > 0) lines.push(`● 외 ${hidden}건`);
+    cards.push({
+      year,
+      color: yearColor(cards.length, YEAR_MAX - YEAR_MIN + 1),
+      era: eraOf(year),
+      lead,
+      lines,
+      models: rows,
+    });
   }
-  if (model.landmark && spanDays >= LANDMARK_NAME_SPAN_DAYS) {
-    return { show: true, text: yymm(model.date) };
-  }
-  if (model.landmark) {
-    return { show: true, text: `${yymm(model.date)}\n${model.name}` };
-  }
-  if (spanDays < ALL_NAME_SPAN_DAYS) {
-    return { show: true, text: model.name };
-  }
-  return { show: false, text: model.name };
+  return cards;
 }

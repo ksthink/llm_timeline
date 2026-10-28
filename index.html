@@ -4,45 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LLM TIMELINE</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23070708' width='32' height='32'/%3E%3Cpath d='M2 16c4-8 8 8 12 0s8 8 16 0' fill='none' stroke='%23E8893A' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23444'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F4F269'/%3E%3C/svg%3E" />
   </head>
   <body>
-    <header>
-      <h1>LLM TIMELINE</h1>
-      <p id="stats">모델을 불러오는 중</p>
-    </header>
-    <div class="toolbar">
-      <div class="filters">
-        <label>분야
-          <select id="field">
-            <option value="">전체</option>
-          </select>
-        </label>
-        <label>국가
-          <select id="country">
-            <option value="">전체</option>
-          </select>
-        </label>
-        <label>공개
-          <select id="lane">
-            <option value="">전체</option>
-            <option value="open">오픈</option>
-            <option value="closed">비공개</option>
-            <option value="unknown">미확인</option>
-          </select>
-        </label>
-        <button type="button" id="reset">전체 기간</button>
-      </div>
-      <div id="eras"></div>
+    <div id="toolbar">
+      <p id="title">LLM 타임라인</p>
+      <label>국가
+        <select id="country">
+          <option value="">전체</option>
+        </select>
+      </label>
+      <label>모델
+        <input id="model" list="model-list" placeholder="이름 검색" autocomplete="off" />
+      </label>
+      <datalist id="model-list"></datalist>
+      <button type="button" id="clear-filter">초기화</button>
+      <p id="count"></p>
     </div>
-    <p class="toolbar key">큰 숫자 이정표 · 채운 점 검증 일치 · 빈 점 수정 · 다이아몬드 불일치·확인불가 · 흰 테두리 한국 · 흰 점 시대 경계</p>
-    <div class="stage">
-      <div id="chart" role="img" aria-label="2015년부터 2026년까지의 LLM 타임라인 차트"></div>
-      <aside id="detail"></aside>
+    <div id="stage">
+      <div id="paper-container"></div>
+      <p id="empty" hidden>조건에 맞는 모델이 없습니다.</p>
+      <p id="hint">연도 점을 누르면 그 해 목록이 열립니다. 점 안의 그림은 대표 모델의 회사입니다.</p>
+      <aside id="detail" hidden>
+        <header>
+          <div>
+            <h2 id="detail-year"></h2>
+            <p id="detail-meta"></p>
+          </div>
+          <button type="button" id="close-detail">닫기</button>
+        </header>
+        <ul id="detail-list"></ul>
+      </aside>
     </div>
-    <footer>
-      <p>자료 283건, 2015–2026. 세로 위치는 공개 여부를 나눈 자리이며 성능 점수가 아닙니다. 휠이나 아래 슬라이더로 구간을 옮기고, 점을 누르면 모델 정보가 열립니다. 차트는 Apache ECharts입니다.</p>
-    </footer>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

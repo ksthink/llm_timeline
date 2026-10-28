@@ -10,7 +10,8 @@
     "test": "node --test test/layout.test.js"
   },
   "dependencies": {
-    "echarts": "^5.6.0"
+    "@joint/core": "4.3.1",
+    "simple-icons": "^15.22.0"
   },
   "devDependencies": {
     "vite": "^6.0.0"
